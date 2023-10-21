@@ -220,8 +220,9 @@ int main()
 	ignoresig();
 	if (!EVinit())
 		fatal("can't initialize environment");
-	if ((prompt = EVget("PS2")) == NULL)
-		prompt = ">";
+	if ((prompt = EVget("PS2")) == NULL){
+		prompt = "ush >: ";	
+	}
 	printf("%s", prompt);
 
 	while (1)
