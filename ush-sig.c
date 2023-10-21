@@ -5,35 +5,35 @@
 #include "ush-sig.h"
 #include "ush-prt.h"
 
-static void (*entryint) (), (*entryquit) ();
+static void (*entryint)(), (*entryquit)();
 
 void ignoresig()
-{				/* ignore interrupt and quit */
+{ /* ignore interrupt and quit */
     static BOOLEAN first = TRUE;
 
-    if (first) {
-	first = FALSE;
-	entryint = signal(SIGINT, SIG_IGN);
-	entryquit = signal(SIGQUIT, SIG_IGN);
-	if (entryint == SIG_ERR || entryquit == SIG_ERR)
-	    syserr("signal");
+    if (first)
+    {
+        first = FALSE;
+        entryint = signal(SIGINT, SIG_IGN);
+        entryquit = signal(SIGQUIT, SIG_IGN);
+        if (entryint == SIG_ERR || entryquit == SIG_ERR)
+            syserr("signal");
     }
 
     else if (signal(SIGINT, SIG_IGN) == SIG_ERR ||
-	     signal(SIGQUIT, SIG_IGN) == SIG_ERR)
-	syserr("signal");
+             signal(SIGQUIT, SIG_IGN) == SIG_ERR)
+        syserr("signal");
 }
 
-
 void entrysig()
-{				/* restore interrupt and quit */
+{ /* restore interrupt and quit */
     if (signal(SIGINT, entryint) == SIG_ERR ||
-	signal(SIGQUIT, entryquit) == SIG_ERR)
-	syserr("signal");
+        signal(SIGQUIT, entryquit) == SIG_ERR)
+        syserr("signal");
 }
 
 void catchsigs()
-{				/* catch signals */
+{ /* catch signals */
     void cleanup();
     // static void setsig();
 
@@ -43,38 +43,39 @@ void catchsigs()
     setsig(SIGTERM, cleanup);
 }
 
-void setsig(sig, fcn)		/* set signal if defaulted */
-     int sig;
-     void (*fcn) ();
+void setsig(sig, fcn) /* set signal if defaulted */
+    int sig;
+void (*fcn)();
 {
     if (signal(sig, SIG_IGN) == SIG_ERR)
-	syserr("signal");
+        syserr("signal");
     else if (signal(sig, SIG_IGN) == SIG_IGN)
-	return;
-    else if (signal(sig, SIG_IGN) == SIG_DFL) {
-	if (signal(sig, fcn) == SIG_ERR)
-	    syserr("signal");
+        return;
+    else if (signal(sig, SIG_IGN) == SIG_DFL)
+    {
+        if (signal(sig, fcn) == SIG_ERR)
+            syserr("signal");
     }
     else
-	fatal("signal already caught!");
-
+        fatal("signal already caught!");
 }
 
 void cleanup(int sig)
-{				/* clean up and terminate */
+{ /* clean up and terminate */
 
     if (signal(sig, SIG_IGN) == SIG_ERR)
-	syserr("signal");
+        syserr("signal");
 
-    switch (sig) {
+    switch (sig)
+    {
     case SIGHUP:
-	fprintf(stderr, "Hangup.\n");
-	break;
+        fprintf(stderr, "Hangup.\n");
+        break;
     case SIGINT:
-	fprintf(stderr, "Interrupt.\n");
-	break;
+        fprintf(stderr, "Interrupt.\n");
+        break;
     case SIGQUIT:
-	fprintf(stderr, "Quit.\n");
+        fprintf(stderr, "Quit.\n");
     }
     exit(1);
 }

@@ -13,15 +13,12 @@ void fatal(char *msg)
 void syserr(char *msg)
 {				/* print system callerror message and
 				   terminate */
-    // extern int sys_nerr;
+    extern int sys_nerr;
 
     fprintf(stderr, "ERROR: %s (%d", msg, errno);
-    if (errno > 0 && errno < sys_nerr)
       /* chnaged to from sys_errlist[errno] to */
       /* strerror(errno) for POSIX compliance */
       fprintf(stderr, ";%s)\n", strerror(errno));
-    else
-	fprintf(stderr, ")\n");
     exit(1);
 }
 
