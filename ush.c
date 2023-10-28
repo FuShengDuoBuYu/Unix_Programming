@@ -10,6 +10,17 @@
 #define MAXWORD 100
 #define BADFD -2
 
+static void waitfor(int pid)
+{ /* wait for child */
+
+	int wpid, status;
+
+	while ((wpid = wait(&status)) != pid && wpid != -1)
+		statusprt(wpid, status);
+	if (wpid == pid)
+		statusprt(0, status);
+}
+
 //////////////////////////////////////////////////////////
 // You must implement the invoke function 					//
 // return the process id									     //
@@ -19,8 +30,28 @@ static int invoke(int argc, char *argv[], int srcfd, char *srcfile,
 									BOOLEAN bckgrnd)
 /* invoke simple command */
 {
-	// handle the environment assignment
-	
+	pid_t pid = fork();
+	if (pid < 0)
+	{
+		perror("fork error");
+		exit(EXIT_FAILURE);
+	}
+	// child process
+	else if (pid == 0)
+	{
+		execvp(argv[0], argv);
+		perror("command error");
+		exit(EXIT_FAILURE);
+	}
+	// parent process
+	else {
+		if(bckgrnd){
+			return 0;
+		}
+		else{
+			return pid;
+		}
+	}
 }
 
 //////////////////////////////////////////////////////////
@@ -69,16 +100,6 @@ static void redirect(int srcfd, char *srcfile, int dstfd, char *dstfile,
 	}
 }
 
-static void waitfor(int pid)
-{ /* wait for child */
-
-	int wpid, status;
-
-	while ((wpid = wait(&status)) != pid && wpid != -1)
-		statusprt(wpid, status);
-	if (wpid == pid)
-		statusprt(0, status);
-}
 //////////////////////////////////////////////////////////
 // You must implement the builtin function 	to do				//
 // the builtin command. 									//
@@ -148,7 +169,8 @@ static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp)
 	dstfd = 1;
 	while (1)
 	{
-		switch (token = gettoken(word))
+		token = gettoken(word);
+		switch (token)
 		{
 		case T_WORD:
 			if (argc == MAXARG)
@@ -176,7 +198,6 @@ static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp)
 				break;
 			}
 			srcfd = BADFD;
-			// < 重定向
 			redirect(srcfd, srcfile, dstfd, dstfile, append, FALSE);
 			continue;
 		case T_GT:
@@ -192,7 +213,6 @@ static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp)
 			}
 			dstfd = BADFD;
 			append = FALSE;
-			// > 重定向
 			redirect(srcfd, srcfile, dstfd, dstfile, append, FALSE);
 			continue;
 		case T_GTGT:
@@ -208,35 +228,29 @@ static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp)
 			}
 			dstfd = BADFD;
 			append = TRUE;
-			// >> 重定向
 			redirect(srcfd, srcfile, dstfd, dstfile, append, FALSE);
 			continue;
 		case T_BAR:
 		case T_AMP:
+			term = T_AMP;
+			break;
 		case T_SEMI:
 		case T_NL:
 			argv[argc] = NULL;
-			// | 
-			if (token == T_BAR)
-			{
-				if (dstfd != 1)
-				{
-					fprintf(stderr, "> or >> conflicts with |\n");
-					break;
-				}
-				term = command(waitpid, TRUE, &dstfd);
-			}
-			else
-				term = token;
-			// here invoke the builtin function
-			if (!builtin(argc, argv, srcfd, dstfd))
-			{
-				if(!EVcommand(argc, argv)){
-					// here invoke the invoke function
-					printf("%s","invoke\n");
-					invoke(argc, argv, srcfd, srcfile, dstfd, dstfile, append, FALSE);
-				}
-			}
+			// |
+			// if (token == T_BAR)
+			// {
+			// 	if (dstfd != 1)
+			// 	{
+			// 		fprintf(stderr, "> or >> conflicts with |\n");
+			// 		break;
+			// 	}
+			// 	term = command(waitpid, TRUE, &dstfd);
+			// }
+			// else{
+			// 	term = token;
+			// }
+				
 			// pipe
 			if (makepipe)
 			{
@@ -245,14 +259,25 @@ static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp)
 				*pipefdp = pfd[1];
 				srcfd = pfd[0];
 			}
-			// &
-			if (term == T_AMP)
-				pid = invoke(argc, argv, srcfd,
-										 srcfile, dstfd, dstfile, append, TRUE);
-			else
-				pid = invoke(argc, argv, srcfd, srcfile, dstfd, dstfile,
-										 append, FALSE);
 
+			if (!builtin(argc, argv, srcfd, dstfd))
+			{
+				if (!EVcommand(argc, argv))
+				{
+					if (term == T_AMP){
+						pid = invoke(argc, argv, srcfd, srcfile, dstfd, dstfile, append, TRUE);
+						
+					}
+					else{
+						pid = invoke(argc, argv, srcfd, srcfile, dstfd, dstfile, append, FALSE);
+						
+					}
+					*waitpid = pid;
+					return T_NL;
+				}
+			}
+
+			term = token;
 			if (token != T_BAR)
 				*waitpid = pid;
 			if (argc == 0 && (token != T_NL || srcfd > 1))

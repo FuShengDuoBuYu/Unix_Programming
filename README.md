@@ -246,3 +246,79 @@ BOOLEAN EVcommand(int argc, char *argv[]){// unset var
 }
 ```
 ![Part3_3](./readme.assets/part3_3.png)
+
+---
+
+### 指令合法性检查(5分)
+想要检查指令的合法性,那么就需要调用`execvp`来执行用户的外部指令,所以我们可以将指令分为如下三类:
+- builtIn
+- EVcommand
+- invoke的外部指令
+由于外部指令分为**前台**和**后台**指令,所以需要对指令进行判断,执行不同的逻辑:
+```c
+static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp)
+{
+	//...
+	case T_NL:
+	argv[argc] = NULL;
+	if (!builtin(argc, argv, srcfd, dstfd))
+	{
+		if (!EVcommand(argc, argv))
+		{
+			if (term == T_AMP){
+				pid = invoke(argc, argv, srcfd, srcfile, dstfd, dstfile, append, TRUE);
+			}
+			else{
+				pid = invoke(argc, argv, srcfd, srcfile, dstfd, dstfile, append, FALSE);
+			}
+			*waitpid = pid;
+			return T_NL;
+		}
+	}
+	//...
+}
+```
+
+在执行指令时,应该`fork`出一个子进程,在子进程中执行指令,并且在父进程中等待子进程结束,如果是后台指令,则不等待子进程结束.
+- 如果`execvp`出错,那么会执行`perror("command error");exit(EXIT_FAILURE);`两句话,表示用户输入的指令不合法.
+- 子进程负责执行语句
+- 父进程负责根据后台/前台进程的标志确定返回值,返回子进程`pid`时代表这是前台进程,需要等待,否则返回`0`,表示这是后台进程不需要等待.
+```c
+static int invoke(int argc, char *argv[], int srcfd, char *srcfile,
+									int dstfd, char *dstfile, BOOLEAN append,
+									BOOLEAN bckgrnd)
+/* invoke simple command */
+{
+	pid_t pid = fork();
+	if (pid < 0)
+	{
+		perror("fork error");
+		exit(EXIT_FAILURE);
+	}
+	// child process
+	else if (pid == 0)
+	{
+		execvp(argv[0], argv);
+		perror("command error");
+		exit(EXIT_FAILURE);
+	}
+	// parent process
+	else {
+		if(bckgrnd){
+			return 0;
+		}
+		else{
+			return pid;
+		}
+	}
+}
+```
+
+#### 4.1指令合法性检查与指令执行图
+![Part4_1](./readme.assets/part4_1.png)
+- `sleep 3`:这条指令是前台指令,因此会等待3秒
+- `sleep 3 &`:这条指令是后台指令,因此不会等待3秒,直接输出`ush >: `
+	- 注:这里因为是截图,所以看上去一样,实际上是会有时间区别的
+- `ls`: 这是一个合法的外部指令,因此会执行`ls`指令
+- `llls`: 这是一个不合法的外部指令,因此会报错,并且退出子进程
+- `eeecho`: 这是一个不合法的外部指令,因此会报错,并且退出子进程
