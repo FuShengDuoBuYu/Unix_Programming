@@ -131,9 +131,17 @@ static BOOLEAN builtin(int argc, char *argv[], int srcfd, int dstfd)
 	// echo
 	if (argc > 0 && strcmp(argv[0], "echo") == 0)
 	{
-		int i;
-		for (i = 1; i < argc; i++)
+		// echo $+var
+		if (argc == 2 && argv[1][0] == '$')
 		{
+			char *var = EVget(argv[1] + 1);
+			if (var != NULL){
+				printf("%s\n", var);
+			}
+			return TRUE;
+		}
+		// echo string
+		for (int i = 1; i < argc; i++){
 			printf("%s ", argv[i]);
 		}
 		printf("\n");
@@ -276,7 +284,6 @@ static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp)
 					{
 						pid = invoke(argc, argv, srcfd, srcfile, dstfd, dstfile, append, FALSE);
 						if (makepipe){
-							printf("pipef");
 							close(dstfd);
 						}
 					}

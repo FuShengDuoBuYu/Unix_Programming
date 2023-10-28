@@ -40,9 +40,19 @@ static BOOLEAN builtin(int argc, char *argv[], int srcfd, int dstfd)
 			exit(atoi(argv[1]));
 	}
 	// echo
-	if (argc > 0 && strcmp(argv[0], "echo") == 0){
-		int i;
-		for(i = 1; i < argc; i++){
+	if (argc > 0 && strcmp(argv[0], "echo") == 0)
+	{
+		// echo $+var
+		if (argc == 2 && argv[1][0] == '$')
+		{
+			char *var = EVget(argv[1] + 1);
+			if (var != NULL){
+				printf("%s\n", var);
+			}
+			return TRUE;
+		}
+		// echo string
+		for (int i = 1; i < argc; i++){
 			printf("%s ", argv[i]);
 		}
 		printf("\n");
@@ -69,8 +79,9 @@ static BOOLEAN builtin(int argc, char *argv[], int srcfd, int dstfd)
 }
 ```
 #### 1.1指令执行图
-![part1](./readme.assets/part1.png)
-
+![part1](./readme.assets/part1_1.png)
+- 这里`echo`也支持输出环境变量,例如`echo $HOME`会输出`/home/username`
+![part1_1](./readme.assets/part1_2.png)
 
 
 ---
