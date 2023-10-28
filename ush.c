@@ -39,18 +39,26 @@ static int invoke(int argc, char *argv[], int srcfd, char *srcfile,
 	// child process
 	else if (pid == 0)
 	{
+		// 使得子进程的写入为srcfd
+		if (srcfd != 0)
+		{
+			dup2(srcfd, 0);
+			close(srcfd);
+		}
+		// 使得子进程的输出为dstfd
+		if (dstfd != 1)
+		{
+			dup2(dstfd, 1);
+			close(dstfd);
+		}
 		execvp(argv[0], argv);
 		perror("command error");
 		exit(EXIT_FAILURE);
 	}
 	// parent process
-	else {
-		if(bckgrnd){
-			return 0;
-		}
-		else{
-			return pid;
-		}
+	else
+	{
+		return bckgrnd ? 0 : pid;
 	}
 }
 
@@ -167,6 +175,7 @@ static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp)
 	argc = 0;
 	srcfd = 0;
 	dstfd = 1;
+
 	while (1)
 	{
 		token = gettoken(word);
@@ -231,60 +240,52 @@ static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp)
 			redirect(srcfd, srcfile, dstfd, dstfile, append, FALSE);
 			continue;
 		case T_BAR:
+
 		case T_AMP:
-			term = T_AMP;
-			break;
-		case T_SEMI:
+			if (token == T_AMP)
+			{
+				term = T_AMP;
+				break;
+			}
 		case T_NL:
 			argv[argc] = NULL;
-			// |
-			// if (token == T_BAR)
-			// {
-			// 	if (dstfd != 1)
-			// 	{
-			// 		fprintf(stderr, "> or >> conflicts with |\n");
-			// 		break;
-			// 	}
-			// 	term = command(waitpid, TRUE, &dstfd);
-			// }
-			// else{
-			// 	term = token;
-			// }
-				
+
+			if (token == T_BAR)
+			{
+				term = command(waitpid, TRUE, &srcfd);
+			}
+
 			// pipe
 			if (makepipe)
 			{
 				if (pipe(pfd) == -1)
 					syserr("pipe");
-				*pipefdp = pfd[1];
-				srcfd = pfd[0];
+				dstfd = pfd[1];
+				*pipefdp = pfd[0];
 			}
 
 			if (!builtin(argc, argv, srcfd, dstfd))
 			{
 				if (!EVcommand(argc, argv))
 				{
-					if (term == T_AMP){
+					if (term == T_AMP)
+					{
 						pid = invoke(argc, argv, srcfd, srcfile, dstfd, dstfile, append, TRUE);
-						
 					}
-					else{
+					else
+					{
 						pid = invoke(argc, argv, srcfd, srcfile, dstfd, dstfile, append, FALSE);
-						
+						if (makepipe){
+							printf("pipef");
+							close(dstfd);
+						}
 					}
+					while (--argc >= 0)
+						free(argv[argc]);
 					*waitpid = pid;
-					return T_NL;
 				}
 			}
-
-			term = token;
-			if (token != T_BAR)
-				*waitpid = pid;
-			if (argc == 0 && (token != T_NL || srcfd > 1))
-				fprintf(stderr, "Missing command\n");
-			while (--argc >= 0)
-				free(argv[argc]);
-			return (term);
+			return T_NL;
 		case T_EOF:
 			exit(0);
 		}
@@ -316,7 +317,10 @@ int main()
 		if (term != T_AMP && pid != 0)
 			waitfor(pid);
 		if (term == T_NL)
+		{
 			printf("%s", prompt);
+		}
+
 		for (fd = 3; fd < 20; fd++)
 			(void)close(fd); /* ignore error */
 	}

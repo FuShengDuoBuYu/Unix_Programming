@@ -16,6 +16,12 @@
 
 ## 实验过程
 
+### 0.实验环境
+- 操作系统: `Ubuntu 22.04.1 LTS`
+- 如何运行: 
+	- `make`
+	- `./spsh`
+
 ---
 
 ### 1.支持基础指令或操作符(10分)
@@ -322,3 +328,60 @@ static int invoke(int argc, char *argv[], int srcfd, char *srcfile,
 - `ls`: 这是一个合法的外部指令,因此会执行`ls`指令
 - `llls`: 这是一个不合法的外部指令,因此会报错,并且退出子进程
 - `eeecho`: 这是一个不合法的外部指令,因此会报错,并且退出子进程
+
+---
+
+### 5.管道操作符(10分)
+由于在`command`中对管道程序是递归执行的,所以这里实现了**从右向左**的管道操作,即先执行最右边的管道程序,然后将其输出重定向到管道中,再执行左边的管道程序,将其输入重定向到管道中,以此类推.
+在这里,以`grep ush | ls`命令为例,实现了管道操作符的功能.
+```c
+static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp)
+{ case T_NL:
+	argv[argc] = NULL;
+
+	if (token == T_BAR)
+	{
+		term = command(waitpid, TRUE, &srcfd);
+	}
+
+	// pipe
+	if (makepipe)
+	{
+		if (pipe(pfd) == -1)
+			syserr("pipe");
+		dstfd = pfd[1];
+		*pipefdp = pfd[0];
+	}
+
+	if (!builtin(argc, argv, srcfd, dstfd))
+	{
+		if (!EVcommand(argc, argv))
+		{
+			if (term == T_AMP)
+			{
+				pid = invoke(argc, argv, srcfd, srcfile, dstfd, dstfile, append, TRUE);
+			}
+			else
+			{
+				pid = invoke(argc, argv, srcfd, srcfile, dstfd, dstfile, append, FALSE);
+				if (makepipe)
+					close(dstfd);
+			}
+			while (--argc >= 0)
+				free(argv[argc]);
+			*waitpid = pid;
+
+			return T_NL;
+		}
+	}
+}
+```
+
+#### 5.1管道操作符与指令执行图
+
+![Part5_1](./readme.assets/part5_1.png)
+
+- 在`command`函数中,如果遇到`T_BAR`词素,则递归调用`command`函数,并且将`makepipe`设置为`TRUE`,表示需要创建管道.
+- 在`command`函数中,如果`makepipe`为`TRUE`,则调用`pipe`函数创建管道,并且将`dstfd`设置为管道的写端,将`pipefdp`设置为管道的读端.
+- 在`command`函数中,如果`makepipe`为`TRUE`,则在执行完`invoke`函数后,关闭`dstfd`,表示不再向管道中写入数据,保证退出管道执行.
+
