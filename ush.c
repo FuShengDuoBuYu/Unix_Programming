@@ -19,6 +19,7 @@ static int invoke(int argc, char *argv[], int srcfd, char *srcfile,
 									BOOLEAN bckgrnd)
 /* invoke simple command */
 {
+	// handle the environment assignment
 	
 }
 
@@ -215,6 +216,7 @@ static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp)
 		case T_SEMI:
 		case T_NL:
 			argv[argc] = NULL;
+			// | 
 			if (token == T_BAR)
 			{
 				if (dstfd != 1)
@@ -229,9 +231,13 @@ static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp)
 			// here invoke the builtin function
 			if (!builtin(argc, argv, srcfd, dstfd))
 			{
-				perror("builtin");
+				if(!EVcommand(argc, argv)){
+					// here invoke the invoke function
+					printf("%s","invoke\n");
+					invoke(argc, argv, srcfd, srcfile, dstfd, dstfile, append, FALSE);
+				}
 			}
-
+			// pipe
 			if (makepipe)
 			{
 				if (pipe(pfd) == -1)
@@ -239,6 +245,7 @@ static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp)
 				*pipefdp = pfd[1];
 				srcfd = pfd[0];
 			}
+			// &
 			if (term == T_AMP)
 				pid = invoke(argc, argv, srcfd,
 										 srcfile, dstfd, dstfile, append, TRUE);

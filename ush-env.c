@@ -20,7 +20,8 @@ BOOLEAN assign(char **p, char *s)
     size = strlen(s) + 1;
     if (*p == NULL)
     {
-        if ((*p = malloc(size)) == NULL){
+        if ((*p = malloc(size)) == NULL)
+        {
             printf("assign: malloc failed\n");
             return (FALSE);
         }
@@ -54,7 +55,8 @@ struct varslot *find(char *name)
     for (i = 0; i < MAXVAR; i++)
         if (sym[i].name == NULL)
         {
-            if (v == NULL){
+            if (v == NULL)
+            {
                 v = &sym[i];
                 break;
             }
@@ -67,6 +69,17 @@ struct varslot *find(char *name)
     return (v);
 }
 
+BOOLEAN EVunset(char *name)
+{ /* unset variable */
+    struct varslot *v = find(name);
+    if (v == NULL || v->name == NULL)
+        return (FALSE);
+    v->name = NULL;
+    v->val = NULL;
+    v->exported = FALSE;
+    return (TRUE);
+}
+
 //////////////////////////////////////////////////////////
 // You must implement the invoke function 					//
 // do the environment set								       //
@@ -76,7 +89,8 @@ BOOLEAN EVset(char *name, char *val)
 { /* add name & valude to enviromnemt */
     struct varslot *v = find(name);
     // set name and value
-    if(!assign(&v->name,name) || !assign(&v->val,val)){
+    if (!assign(&v->name, name) || !assign(&v->val, val))
+    {
         return (FALSE);
     }
     v->exported = FALSE;
@@ -89,24 +103,16 @@ BOOLEAN EVinit()
     int i, namelen;
     char name[100];
 
-    for (i = 0; i<(MAXVAR-10); i++)
-    {
-        namelen = strcspn(environ[i], "=");
-        strncpy(name, environ[i], namelen);
-        name[namelen] = '\0';
-        if (!EVset(name, &environ[i][namelen + 1]) || !EVexport(name)){
-            return (FALSE);
-        }
-    }
-
     // add PATH and HOME
     // get current path
     char *path = getenv("PATH");
     char *home = getenv("HOME");
-    if (!EVset("PATH", path) || !EVexport("PATH")){
+    if (!EVset("PATH", path) || !EVexport("PATH"))
+    {
         return (FALSE);
     }
-    if (!EVset("HOME", home) || !EVexport("HOME")){
+    if (!EVset("HOME", home) || !EVexport("HOME"))
+    {
         return (FALSE);
     }
     return (TRUE);
@@ -122,76 +128,64 @@ char *EVget(char *name)
 
 void EVprint()
 { /* printf environment */
-    int i;
-
-    for (i = 0; i < MAXVAR; i++)
+    for (int i = 0; i < MAXVAR; i++)
         if (sym[i].name != NULL)
-            printf("%3s %s=%s\n", sym[i].exported ? "[E]" : "",sym[i].name, sym[i].val);
+            printf("%3s %s=%s\n", sym[i].exported ? "[E]" : "", sym[i].name, sym[i].val);
 }
 
-//////////////////////////////////////////////////////////
-// You must implement the invoke function 					//
-// do the environment assignment						       //
-//////////////////////////////////////////////////////////
-void asg(int argc, char *argv[])
-{ /* assignment command */
-    
-}
-
-//////////////////////////////////////////////////////////
-// You must implement the invoke function 					//
-// do the environment assignment						       //
-//////////////////////////////////////////////////////////
-void set(int argc, char *argv[])
-{ /* set command */
-    int i;
-    // if no argument, print the environment
-    if (argc == 1)
+BOOLEAN EVcommand(int argc, char *argv[])
+{
+    // only set
+    if (argc == 1 && strcmp(argv[0], "set") == 0)
     {
         EVprint();
-        return;
+        return TRUE;
     }
-    // if there is argument, set the environment
-    if(argc == 3){
-        EVset(argv[1],argv[2]);
-    }
-    else{
-        printf("set: wrong argument number\n");
-    }
-}
-
-void export(int argc, char *argv[])
-{ /* export command */
-    int i;
-    // if no argument, print the environment
-    if (argc == 1)
+    // only export
+    if (argc == 1 && strcmp(argv[0], "export") == 0)
     {
         EVprint();
-        return;
+        return TRUE;
     }
-    // if there is argument, set the environment
-    if(argc == 2){
-        EVexport(argv[1]);
-    }
-    else{
-        printf("export: wrong argument number\n");
-    }
-}
-
-void unset(int argc, char *argv[])
-{ /* unset command */
-    int i;
-    // if no argument, print the environment
-    if (argc == 1)
+    // set var value
+    if (argc == 2 && strcmp(argv[0], "set") == 0)
     {
-        EVprint();
-        return;
+        // split the argv[1] to var and value
+        char *name = strtok(argv[1], "=");
+        char *value = strtok(NULL, "=");
+        if (!EVset(name, value))
+        {
+            printf("set error\n");
+        }
+        return TRUE;
     }
-    // if there is argument, set the environment
-    if(argc == 2){
-        EVset(argv[1],"");
+    // export var
+    if (argc == 2 && strcmp(argv[0], "export") == 0)
+    {
+        // split the argv[1] to var and value
+        char *name = strtok(argv[1], "=");
+        char *value = strtok(NULL, "=");
+        if(find(name) == NULL || find(name)->name == NULL){
+            if(!EVset(name, value)){
+                printf("set error\n");
+            }
+        }
+        if(!EVexport(name)){
+            printf("export error\n");
+        }
+        return TRUE;
     }
-    else{
-        printf("unset: wrong argument number\n");
+    // unset var
+    if (argc == 2 && strcmp(argv[0], "unset") == 0)
+    {
+        // split the argv[1] to var and value
+        char *name = strtok(argv[1], "=");
+        char *value = strtok(NULL, "=");
+        if (!EVunset(name))
+        {
+            printf("unset error\n");
+        }
+        return TRUE;
     }
+    return FALSE;
 }

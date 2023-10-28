@@ -148,3 +148,101 @@ static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp){
 ![Part2_4](./readme.assets/part2_3.png)
 当`test.txt`文件存在时,会在文件末尾追加内容,并且输出内容为执行命令的输出.
 执行的命令分别为`pwd`,`cd ..`,`pwd`,`exit`.
+
+---
+
+### 3.处理环境变量(5分)
+#### 3.1启动shell时配置HOME和PATH
+由于`HOME`和`PATH`应该由原始`shell`继承而来,因此在这里使用了系统调用,并在初始化时的`EVinit`配置完成:
+```c
+BOOLEAN EVinit()
+{ /* initialize symbol table from
+     environment */
+    int i, namelen;
+    char name[100];
+    char *path = getenv("PATH");
+    char *home = getenv("HOME");
+    if (!EVset("PATH", path) || !EVexport("PATH")){
+        return (FALSE);
+    }
+    if (!EVset("HOME", home) || !EVexport("HOME")){
+        return (FALSE);
+    }
+    return (TRUE);
+}
+```
+
+#### 3.2实现环境变量的修改的操作符
+在这里,实现了`set`,`unset`,`export`三个操作符,思路是检查用户输入的命令,如果是这三个操作符,则调用对应的函数,并且返回`TRUE`,否则返回`FALSE`.
+在`EVcommand`函数中,实现对应的操作.
+- 由于每个操作符实际只对某个环境变量进行操作,因此这里未调用已有的`set`,`asg`等函数,而是自己写了一个`EVcommand`函数,用来处理这三个操作符,调用`EVset`,`EVunset`,`EVexport`函数.
+##### 3.2.1 set操作符
+- `set`操作符用来设置环境变量,如果没有输入参数,则输出所有的环境变量,对应`EVcommand`的逻辑如下:
+```c
+BOOLEAN EVcommand(int argc, char *argv[]){
+	// only set
+	if (argc == 1 && strcmp(argv[0], "set") == 0){
+			EVprint();
+			return TRUE;
+	}
+	// set var value
+	if (argc == 2 && strcmp(argv[0], "set") == 0){
+		char *name = strtok(argv[1], "=");
+		char *value = strtok(NULL, "=");
+		if (!EVset(name, value)){
+				printf("set error\n");
+		}
+		return TRUE;
+	}
+}
+```
+![Part3_1](./readme.assets/part3_1.png)
+##### 3.2.2 unset操作符
+- `unset`操作符用来删除环境变量,如果没有该变量则报错,对应`EVcommand`的逻辑如下:
+```c
+BOOLEAN EVcommand(int argc, char *argv[]){// unset var
+	if (argc == 2 && strcmp(argv[0], "unset") == 0)
+	{
+			// split the argv[1] to var and value
+			char *name = strtok(argv[1], "=");
+			char *value = strtok(NULL, "=");
+			if (!EVunset(name))
+			{
+					printf("unset error\n");
+			}
+			return TRUE;
+	}
+	return FALSE;
+}
+```
+
+![Part3_2](./readme.assets/part3_2.png)
+
+##### 3.2.3 export操作符
+- `export`操作符用来将环境变量导出,如果没有该变量则先设置该变量后导出
+- 如果没有输入参数,则输出所有的环境变量,对应`EVcommand`的逻辑如下:
+```c
+BOOLEAN EVcommand(int argc, char *argv[]){// unset var
+	// only export
+	if (argc == 1 && strcmp(argv[0], "export") == 0){
+			EVprint();
+			return TRUE;
+	}
+	// export var
+	if (argc == 2 && strcmp(argv[0], "export") == 0){
+		// split the argv[1] to var and value
+		char *name = strtok(argv[1], "=");
+		char *value = strtok(NULL, "=");
+		if(find(name) == NULL || find(name)->name == NULL){
+			if(!EVset(name, value)){
+				printf("set error\n");
+			}
+		}
+		if(!EVexport(name)){
+			printf("export error\n");
+		}
+		return TRUE;
+	}
+}
+```
+![Part3_3](./readme.assets/part3_3.png)
