@@ -19,7 +19,7 @@ static int invoke(int argc, char *argv[], int srcfd, char *srcfile,
 									BOOLEAN bckgrnd)
 /* invoke simple command */
 {
-	return 0;
+	
 }
 
 //////////////////////////////////////////////////////////
@@ -28,6 +28,44 @@ static int invoke(int argc, char *argv[], int srcfd, char *srcfile,
 static void redirect(int srcfd, char *srcfile, int dstfd, char *dstfile,
 										 BOOLEAN append, BOOLEAN bckgrnd)
 { /* I/O redirection */
+	int fd_in, fd_out;
+	// input overload
+	if (srcfd == BADFD)
+	{
+		fd_in = open(srcfile, O_RDONLY);
+		if (fd_in < 0)
+		{
+			printf("srcfile: %s\n", srcfile);
+			perror("error when try to open the input file");
+			exit(EXIT_FAILURE);
+		}
+		// success open the file
+		dup2(fd_in, srcfd);
+		close(fd_in);
+	}
+
+	if (dstfd == BADFD)
+	{
+		int flags = O_CREAT | O_WRONLY;
+		if (append == TRUE)
+		{
+			flags |= O_APPEND;
+		}
+		else
+		{
+			flags |= O_TRUNC;
+		}
+
+		fd_out = open(dstfile, flags, 0666);
+		if (fd_out < 0)
+		{
+			printf("dstfile: %s\n", dstfile);
+			perror("error when try to open the output file");
+			exit(EXIT_FAILURE);
+		}
+		dup2(fd_out, dstfd);
+		close(fd_out);
+	}
 }
 
 static void waitfor(int pid)
@@ -53,34 +91,41 @@ static BOOLEAN builtin(int argc, char *argv[], int srcfd, int dstfd)
 {
 	// the built-in function is cd,echo,exit,pwd
 	// exit
-	if (argc > 0 && strcmp(argv[0], "exit") == 0){
-		if(argc == 1)
+	if (argc > 0 && strcmp(argv[0], "exit") == 0)
+	{
+		if (argc == 1)
 			exit(0);
 		else
 			exit(atoi(argv[1]));
 	}
 	// echo
-	if (argc > 0 && strcmp(argv[0], "echo") == 0){
+	if (argc > 0 && strcmp(argv[0], "echo") == 0)
+	{
 		int i;
-		for(i = 1; i < argc; i++){
+		for (i = 1; i < argc; i++)
+		{
 			printf("%s ", argv[i]);
 		}
 		printf("\n");
 		return TRUE;
 	}
 	// pwd
-	if (argc > 0 && strcmp(argv[0], "pwd") == 0){
+	if (argc > 0 && strcmp(argv[0], "pwd") == 0)
+	{
 		char buf[100];
 		getcwd(buf, 100);
 		printf("%s\n", buf);
 		return TRUE;
 	}
 	// cd
-	if (argc > 0 && strcmp(argv[0], "cd") == 0){
-		if(argc == 1){
+	if (argc > 0 && strcmp(argv[0], "cd") == 0)
+	{
+		if (argc == 1)
+		{
 			chdir(getenv("HOME"));
 		}
-		else{
+		else
+		{
 			chdir(argv[1]);
 		}
 		return TRUE;
@@ -130,6 +175,8 @@ static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp)
 				break;
 			}
 			srcfd = BADFD;
+			// < 重定向
+			redirect(srcfd, srcfile, dstfd, dstfile, append, FALSE);
 			continue;
 		case T_GT:
 			if (dstfd != 1)
@@ -144,6 +191,8 @@ static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp)
 			}
 			dstfd = BADFD;
 			append = FALSE;
+			// > 重定向
+			redirect(srcfd, srcfile, dstfd, dstfile, append, FALSE);
 			continue;
 		case T_GTGT:
 			if (dstfd != 1)
@@ -158,6 +207,8 @@ static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp)
 			}
 			dstfd = BADFD;
 			append = TRUE;
+			// >> 重定向
+			redirect(srcfd, srcfile, dstfd, dstfile, append, FALSE);
 			continue;
 		case T_BAR:
 		case T_AMP:
@@ -176,10 +227,11 @@ static TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefdp)
 			else
 				term = token;
 			// here invoke the builtin function
-			if (!builtin(argc, argv, srcfd, dstfd)){
+			if (!builtin(argc, argv, srcfd, dstfd))
+			{
 				perror("builtin");
 			}
-				
+
 			if (makepipe)
 			{
 				if (pipe(pfd) == -1)
@@ -220,8 +272,9 @@ int main()
 	ignoresig();
 	if (!EVinit())
 		fatal("can't initialize environment");
-	if ((prompt = EVget("PS2")) == NULL){
-		prompt = "ush >: ";	
+	if ((prompt = EVget("PS2")) == NULL)
+	{
+		prompt = "ush >: ";
 	}
 	printf("%s", prompt);
 
