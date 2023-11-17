@@ -91,3 +91,58 @@ gcc signal_synchronize.c
 
 ## 实验思路与代码分析
 ### 实验思路
+本次实验主要分为两个部分，第一个部分为**实现信号同步**，第二个部分为**实现父子进程利用信号同步**
+#### 第一部分：实现信号同步
+1. 参考图`10.24`，可知我们可以利用`SIGUSR1`和`SIGUSR2`来作为父子进程之间传递的信号。
+2. 在`TELL_WAIT`函数中，我们对各个信号集做初始化，并且设置好`SIGUSR1`和`SIGUSR2`的信号处理函数。
+3. 在`TELL_PARENT`和`TELL_CHILD`中，使用`KILL`接口来向各个进程发送对应的信号，也即`SIGUSR1`和`SIGUSR2`。
+4. 在`WAIT_PARENT`和`WAIT_CHILD`中，使用`sigsuspend`来保证在接受所有信号之前，程序进入挂起状态，保证不使用sleep的情况下仍然存在父子进程的同步的先后顺序。
+5. 使用一个全局变量`sigflag`来对当前状态做记录。
+
+当按照上述的思路实现所有接口代码后，便实现了利用信号机制实现同步的接口实现，具体代码详见`signal_sysnchronize.h`。
+
+#### 第二部分：实现父子进程利用信号同步
+我们依然利用`fork`函数来创建父子进程，利用`pid`来区分父进程和子进程并执行对应的不同操作。
+
+> main函数的具体内容如下：
+
+```c
+#include "signal_synchronize.h"
+
+int main(){
+    pid_t pid;
+    // init the synchronize function
+    TELL_WAIT();
+    // fork the process
+    pid = fork();
+    if(pid < 0){
+        printf("fork error!");
+        exit(0);
+    }
+    // child process 
+    else if(pid == 0){
+        WAIT_PARENT();
+        printf("this is child\n");
+        TELL_PARENT(getppid());
+    }
+    // parent process
+    else{
+        printf("here is parent\n");
+        TELL_CHILD(pid);
+        WAIT_CHILD();
+
+    }
+    exit(0);
+}
+```
+
+由代码可见，我们父子进程做了如下不同的操作：
+##### 父进程
+- 父进程率先打印`Here is parent`的信息，并且将父进程已经打印完成的信息通过信号调用`TELL_CHILD`发送给子进程。
+- 发送完信号后，等待子进程发送子进程打印完成的信息通过信号发送给自己，也即调用`WAIT_CHILD`即可。
+
+##### 子进程
+- 子进程首先等待父进程打印完成，接收到父进程打印完成的信号后，开始打印自己打印完成的信息`This is child`。
+- 打印完成后，通知父进程已经打印完成，也即调用`TELL_PARENT`。
+
+![structrue](./readme.assets/structure.png)
