@@ -79,3 +79,15 @@ WAIT_CHILD(void)
 ## 实验要求
 1. 实验报告请提交源代码和实验报告Word文档(包括运行截图，实验思路和代码分析)，打包后以“学号_姓名.zip”命名，上传到本课程elearning平台
 2. 正确实现TELL_CHILD(10分)，WAIT_PARENT(10分)，TELL_PARENT(10分)，WAIT_CHILD(10分)，TELL_WAIT(10分)，程序能正常运行且实现父子进程同步按要求输出(40分)，实验分析和总结(10分)
+
+## 实验结果
+### 如何运行
+```bash
+gcc signal_synchronize.c
+./a.out
+```
+### 运行结果截图
+![result](./readme.assets/result.png)
+
+## 实验思路与代码分析
+### 实验思路
